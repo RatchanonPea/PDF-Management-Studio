@@ -55,6 +55,7 @@ export function Editor({ tab, onTab, onBack, onDirty, pages, sources, addFiles, 
   const [pageId, setPageId] = useState(pages[0]?.id)
   const [preview, setPreview] = useState(null)
   const [runs, setRuns] = useState([])
+  const [runsState, setRunsState] = useState('loading') // loading | ok | an error message
   const [zoom, setZoom] = useState(1)
   const [items, setItems] = useState([])
   const [selected, setSelected] = useState(null)
@@ -96,11 +97,14 @@ export function Editor({ tab, onTab, onBack, onDirty, pages, sources, addFiles, 
     if (!page) return
     let live = true
     setRuns([])
+    setRunsState('loading')
     const doc = sources.get(page.fileId).doc
     renderToCanvas(doc, page.index, 760).then((c) => {
       if (live) setPreview({ url: c.toDataURL('image/jpeg', 0.9), ratio: c.height / c.width })
     })
-    getTextRuns(doc, page.index).then((r) => live && setRuns(r)).catch(() => {})
+    getTextRuns(doc, page.index)
+      .then((r) => { if (live) { setRuns(r); setRunsState('ok') } })
+      .catch((e) => { console.error(e); if (live) setRunsState(`${e?.name || 'Error'}: ${e?.message || e}`) })
     return () => { live = false }
   }, [page?.id])
 
@@ -332,7 +336,11 @@ export function Editor({ tab, onTab, onBack, onDirty, pages, sources, addFiles, 
           {tab === 'edit' && (
             <>
               <p className="hint strong">คลิกข้อความบนหน้ากระดาษ (กรอบสีน้ำเงิน) เพื่อแก้ไข</p>
-              {!runs.length && <p className="hint">ไม่พบข้อความที่แก้ไขได้ในหน้านี้ ไฟล์อาจเป็นภาพสแกน</p>}
+              {runsState === 'loading' && <p className="hint" role="status">กำลังอ่านข้อความในหน้านี้…</p>}
+              {runsState === 'ok' && !runs.length && <p className="hint">ไม่พบข้อความที่แก้ไขได้ในหน้านี้ ไฟล์อาจเป็นภาพสแกน</p>}
+              {runsState !== 'loading' && runsState !== 'ok' && (
+                <p className="error" role="alert">อ่านข้อความในหน้านี้ไม่ได้ ({runsState}) · เวอร์ชัน {__APP_VERSION__}</p>
+              )}
               <p className="hint">ระบบจะปิดทับข้อความเดิมด้วยสีพื้นหลังแล้ววางข้อความใหม่แทน ฟอนต์อาจไม่ตรงกับต้นฉบับ</p>
               <label className="check-row">
                 <input type="checkbox" checked={flatten} onChange={(e) => setFlatten(e.target.checked)} />
