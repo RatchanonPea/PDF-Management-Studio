@@ -68,6 +68,12 @@ export function Editor({ tab, onTab, onBack, onDirty, pages, sources, addFiles, 
   const [wm, setWm] = useState({ text: 'สำเนาถูกต้อง', opacity: 0.25, angle: 35, color: '#2338D4', on: false })
   const [wmImg, setWmImg] = useState(null)
   const input = useRef(null)
+  // phones: the tool panel is a bottom sheet that can be collapsed to just its tabs
+  const [sheet, setSheet] = useState(false)
+
+  useEffect(() => {
+    if (selected) setSheet(true)
+  }, [selected])
 
   useEffect(() => {
     const perPage = {}
@@ -217,7 +223,7 @@ export function Editor({ tab, onTab, onBack, onDirty, pages, sources, addFiles, 
         </div>
         <div className="stage-scroll" onPointerDown={(e) => e.target === e.currentTarget && setSelected(null)}>
           {preview && (
-            <div className="canvas" style={{ width: `${560 * zoom}px`, aspectRatio: `${1 / preview.ratio}` }}>
+            <div className="canvas" style={{ width: `calc(min(560px, 100vw - 32px) * ${zoom})`, aspectRatio: `${1 / preview.ratio}` }}>
               <img src={preview.url} alt="" draggable="false" />
               {here.filter((s) => s.cover).map((s) => (
                 <span key={`c${s.id}`} className="cover-layer" style={{ left: `${s.cover.x * 100}%`, top: `${s.cover.y * 100}%`, width: `${s.cover.w * 100}%`, height: `${s.cover.h * 100}%`, background: s.cover.color }} />
@@ -260,10 +266,13 @@ export function Editor({ tab, onTab, onBack, onDirty, pages, sources, addFiles, 
         </ul>
       </section>
 
-      <aside className="panel">
+      <aside className={`panel ${sheet ? 'is-open' : ''}`}>
+        <button className="sheet-toggle" aria-expanded={sheet} onClick={() => setSheet((v) => !v)}>
+          <span aria-hidden="true">{sheet ? '▾' : '▴'}</span> {sheet ? 'ย่อเมนู' : 'เปิดเมนูเครื่องมือ'}
+        </button>
         <div className="seg wide tabs" role="tablist">
           {TABS.map((t) => (
-            <button key={t.id} role="tab" aria-selected={tab === t.id} className={tab === t.id ? 'on' : ''} onClick={() => onTab(t.id)}>{t.label}</button>
+            <button key={t.id} role="tab" aria-selected={tab === t.id} className={tab === t.id ? 'on' : ''} onClick={() => { setSheet(true); onTab(t.id) }}>{t.label}</button>
           ))}
         </div>
 
