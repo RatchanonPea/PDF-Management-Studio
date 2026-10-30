@@ -392,3 +392,17 @@ select.text { appearance: auto; }
 .size-list button { width: 100%; padding: 6px 10px; text-align: left; background: none; border: 0; border-radius: 5px; font-variant-numeric: tabular-nums; }
 .size-list button:hover { background: var(--stamp-tint); }
 .size-list button.on { background: var(--stamp); color: #fff; }
+
+/* ---------- compact header on phones ---------- */
+.topbar nav a, .topbar nav button, .brand { white-space: nowrap; }
+@media (max-width: 640px) {
+  .topbar { gap: 8px; padding: 8px 12px; }
+  .brand { gap: 8px; font-size: 16px; }
+  .brand-mark { width: 30px; height: 30px; }
+  .topbar nav { gap: 0; }
+  .topbar nav a, .topbar nav button { padding: 8px 10px; font-size: 15px; }
+  .topbar nav a { display: none; } /* privacy + GitHub: reachable from the home page */
+}
+@media (max-width: 380px) {
+  .brand { font-size: 0; gap: 0; } /* logo mark only */
+}
