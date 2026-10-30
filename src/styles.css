@@ -406,3 +406,19 @@ select.text { appearance: auto; }
 @media (max-width: 380px) {
   .brand { font-size: 0; gap: 0; } /* logo mark only */
 }
+
+.appfoot { padding: 20px clamp(16px, 4vw, 48px) 28px; color: var(--muted); font-size: 14px; text-align: center; }
+
+/* ---------- tidy merge / split toolbar on phones ---------- */
+@media (max-width: 640px) {
+  .toolbar { position: static; display: grid; gap: 12px; padding: 14px 16px; } /* too tall to keep pinned */
+  .toolbar h1 { font-size: 22px; }
+  .toolbar-actions { display: grid; grid-template-columns: 1fr 52px 52px; gap: 8px; }
+  .toolbar-actions .btn { min-height: 48px; padding: 8px 12px; }
+  .toolbar-actions .btn:not(.primary) .lbl { display: none; }
+  .toolbar-end { display: grid; gap: 10px; }
+  .toolbar-end .seg { display: flex; }
+  .toolbar-end .seg button { flex: 1; }
+  .toolbar-end .btn.primary { width: 100%; min-height: 50px; }
+  .page-tools button { width: 38px; height: 38px; }
+}

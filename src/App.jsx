@@ -185,6 +185,11 @@ export default function App() {
           </div>
         )}
       </main>
+      {(view === 'home' || view === 'library') && (
+        <footer className="appfoot">
+          Free PDF Studio · เวอร์ชัน {__APP_VERSION__}{__APP_COMMIT__ ? ` (${__APP_COMMIT__})` : ''} · สร้างเมื่อ {__APP_BUILT__}
+        </footer>
+      )}
       {leaving && (
         <LeaveDialog
           count={dirty}
@@ -548,10 +553,12 @@ function Workspace({ tool, onOpen, pages, setPages, addFiles, busy, error, onExp
             <Icon name="plus" /> เพิ่มไฟล์ PDF
           </button>
           <input ref={input} type="file" accept="application/pdf,.pdf" multiple hidden onChange={(e) => { addFiles(e.target.files); e.target.value = '' }} />
-          <button className="btn" disabled={!pages.length} onClick={() => setPages((p) => p.map((x) => ({ ...x, rotation: (x.rotation + 90) % 360 })))}>
-            <Icon name="rotate" /> หมุนทั้งหมด
+          <button className="btn" disabled={!pages.length} onClick={() => setPages((p) => p.map((x) => ({ ...x, rotation: (x.rotation + 90) % 360 })))} aria-label="หมุนทุกหน้า 90 องศา" title="หมุนทุกหน้า 90 องศา">
+            <Icon name="rotate" /> <span className="lbl">หมุนทั้งหมด</span>
           </button>
-          <button className="btn" disabled={!pages.length} onClick={() => setPages([])}>ล้างทั้งหมด</button>
+          <button className="btn" disabled={!pages.length} onClick={() => setPages([])} aria-label="ล้างทุกหน้าออกจากงานนี้" title="ล้างทุกหน้าออกจากงานนี้">
+            <Icon name="trash" /> <span className="lbl">ล้างทั้งหมด</span>
+          </button>
         </div>
         <div className="toolbar-end">
           <div className="seg" role="radiogroup" aria-label="รูปแบบไฟล์ผลลัพธ์">
