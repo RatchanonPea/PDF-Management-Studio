@@ -220,7 +220,8 @@ function Header({ view, libCount, onHome, onLibrary }) {
         <span className="brand-mark" aria-hidden="true">
           <Icon name="sheet" />
         </span>
-        Free PDF Studio
+        <span className="brand-name">Free PDF Studio</span>
+        <span className="ver" title={`เวอร์ชัน ${__APP_VERSION__}${__APP_COMMIT__ ? ` (${__APP_COMMIT__})` : ""} · สร้างเมื่อ ${__APP_BUILT__}`}>v{__APP_VERSION__}</span>
       </button>
       <nav aria-label="เมนูหลัก">
         <button className={view === 'home' ? 'is-here' : ''} onClick={onHome}>เครื่องมือ</button>

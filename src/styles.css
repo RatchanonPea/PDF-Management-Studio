@@ -437,3 +437,6 @@ select.text { appearance: auto; }
   .seg.tabs button { flex: none; white-space: nowrap; }
   .panel-foot { flex: none; background: var(--paper); padding-top: 6px; }
 }
+
+.ver { align-self: center; padding: 1px 8px; border-radius: 99px; background: var(--stamp-tint); color: var(--stamp-dark); font: 600 12px/1.6 var(--body); letter-spacing: .02em; }
+@media (max-width: 480px) { .brand-name { display: none; } .brand { font-size: 16px; gap: 8px; } }
