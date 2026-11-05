@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { importPdf, exportPdf, downloadBlob, formatSize, needsPassword, renderToCanvas, renderBlobPage } from './pdf.js'
 import { Icon } from './icons.jsx'
 import { Editor } from './Editor.jsx'
+import { Toasts, toast, confirmBox } from './toast.jsx'
 
 const TOOLS = [
   { id: 'merge', tone: 'blue', view: 'workspace', icon: 'merge', title: 'รวม / แยกไฟล์', en: 'Merge & Split', desc: 'ต่อ PDF หลายไฟล์เป็นไฟล์เดียว หรือแยกทีละหน้า' },
@@ -48,7 +49,10 @@ export default function App() {
 
   // leaving the editor with unsaved edits asks first: keep as draft or discard
   const requestLeave = (go) => (view === 'editor' && dirty ? setLeaving(() => go) : go())
-  const discardDraft = () => { setEditorSeen(false); setSession((n) => n + 1); setDirty(0); setDraftPages({}) }
+  const discardDraft = (quiet) => {
+    setEditorSeen(false); setSession((n) => n + 1); setDirty(0); setDraftPages({})
+    if (quiet !== true) toast('ทิ้งฉบับร่างแล้ว', { type: 'info' })
+  }
   const sources = useRef(new Map())
 
   // replace: start a new job with these files (older files stay in the library); libraryOnly: just store them
@@ -56,6 +60,7 @@ export default function App() {
     const files = [...fileList].filter((f) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name))
     if (!files.length) {
       setError('รองรับเฉพาะไฟล์ .pdf เท่านั้น')
+      toast('รองรับเฉพาะไฟล์ .pdf เท่านั้น', { type: 'warn' })
       return false
     }
     setError('')
@@ -63,6 +68,9 @@ export default function App() {
     try {
       let ok = false
       let first = replace
+      let count = 0
+      let pageCount = 0
+      let locked = 0
       for (const f of files) {
         try {
           const { src, pages: added } = await importPdf(f)
@@ -72,17 +80,23 @@ export default function App() {
           if (!libraryOnly) setPages((prev) => (fresh ? added : [...prev, ...added]))
           first = false
           ok = true
+          count++
+          pageCount += added.length
         } catch (e) {
           if (!needsPassword(e)) throw e
           if (first && !libraryOnly) setPages([])
           first = false
           setAsk({ file: f, wrong: false, libraryOnly })
           ok = true
+          locked++
         }
       }
+      if (count) toast(`เพิ่ม ${count} ไฟล์ (${pageCount} หน้า) แล้ว${libraryOnly ? ' เก็บไว้ในคลัง' : ''}`)
+      if (locked) toast(locked === 1 ? 'ไฟล์นี้ถูกล็อก ใส่รหัสผ่านเพื่อเปิด' : `${locked} ไฟล์ถูกล็อก ใส่รหัสผ่านเพื่อเปิด`, { type: 'info' })
       return ok
     } catch (e) {
       setError(`เปิดไฟล์ไม่ได้ อาจมีรหัสผ่านหรือไฟล์เสียหาย (${e.message})`)
+      toast('เปิดไฟล์ไม่ได้ อาจมีรหัสผ่านหรือไฟล์เสียหาย', { type: 'error' })
       return false
     } finally {
       setBusy(false)
@@ -97,9 +111,10 @@ export default function App() {
       setLibrary((prev) => [...prev, { id: src.id, name: src.name, size: src.bytes.length, unlocked: src.unlocked, pages: added }])
       if (!ask.libraryOnly) setPages((prev) => [...prev, ...added])
       setAsk(null)
+      toast(`ปลดล็อกและเปิด “${src.name}” แล้ว`)
     } catch (e) {
       if (needsPassword(e)) setAsk({ ...ask, wrong: true })
-      else { setError(`เปิดไฟล์ไม่ได้ (${e.message})`); setAsk(null) }
+      else { setError(`เปิดไฟล์ไม่ได้ (${e.message})`); setAsk(null); toast('เปิดไฟล์ไม่ได้', { type: 'error' }) }
     } finally {
       setBusy(false)
     }
@@ -117,6 +132,8 @@ export default function App() {
   }
   const addToWork = (id) => setPages((prev) => (prev.some((p) => p.fileId === id) ? prev : [...prev, ...library.find((l) => l.id === id).pages]))
   const removeFromLibrary = (id) => {
+    const name = library.find((l) => l.id === id)?.name
+    if (name) toast(`ลบ “${name}” ออกจากคลังแล้ว`)
     sources.current.delete(id)
     setLibrary((prev) => prev.filter((l) => l.id !== id))
     setPages((prev) => prev.filter((p) => p.fileId !== id))
@@ -127,8 +144,9 @@ export default function App() {
     setLibrary([])
     setPages([])
     setResult(null)
-    discardDraft()
+    discardDraft(true)
     setView('home')
+    toast('ล้างข้อมูลในเบราว์เซอร์แล้ว', { type: 'info' })
   }
 
   const runExport = async (mode, edits) => {
@@ -137,6 +155,7 @@ export default function App() {
       setResult(await exportPdf(pages, sources.current, edits, mode))
     } catch (e) {
       setError(`สร้างไฟล์ไม่สำเร็จ: ${e.message}`)
+      toast(`สร้างไฟล์ไม่สำเร็จ: ${e.message}`, { type: 'error' })
     } finally {
       setBusy(false)
     }
@@ -202,12 +221,13 @@ export default function App() {
       {leaving && (
         <LeaveDialog
           count={dirty}
-          onDraft={() => { const go = leaving; setLeaving(null); go() }}
+          onDraft={() => { const go = leaving; setLeaving(null); go(); toast('เก็บเป็นฉบับร่างแล้ว', { type: 'info' }) }}
           onDiscard={() => { const go = leaving; setLeaving(null); discardDraft(); go() }}
           onStay={() => setLeaving(null)}
         />
       )}
       {ask && <PasswordDialog ask={ask} busy={busy} onSubmit={unlock} onCancel={() => setAsk(null)} />}
+      <Toasts />
       {result && (
         <ResultModal
           result={result}
@@ -418,7 +438,13 @@ function Library({ library, pages, draftPages, busy, error, addFiles, onWork, on
                 <div className="lib-actions">
                   <button className="btn primary" onClick={() => onWork([l.id])}>เปิดไฟล์นี้</button>
                   {!inWork(l.id) && <button className="btn" onClick={() => onAdd(l.id)}>เพิ่มเข้างานปัจจุบัน</button>}
-                  <button className="btn quiet" onClick={() => window.confirm(`ลบ “${l.name}” ออกจากคลัง?`) && onRemove(l.id)}>ลบ</button>
+                  <button
+                    className="btn quiet"
+                    onClick={async () => {
+                      const yes = await confirmBox({ title: `ลบ “${l.name}” ออกจากคลัง?`, message: 'ไฟล์จะหายไปจากหน่วยความจำของเบราว์เซอร์ และถ้ากำลังใช้ในงานปัจจุบัน จะถูกเอาออกจากงานด้วย', confirmLabel: 'ลบออก', danger: true })
+                      if (yes) onRemove(l.id)
+                    }}
+                  >ลบ</button>
                 </div>
               </li>
             ))}
@@ -557,7 +583,18 @@ function Workspace({ tool, onOpen, pages, setPages, addFiles, busy, error, onExp
     })
   }
   const rotate = (id) => setPages((prev) => prev.map((p) => (p.id === id ? { ...p, rotation: (p.rotation + 90) % 360 } : p)))
-  const remove = (id) => setPages((prev) => prev.filter((p) => p.id !== id))
+  const remove = (id) => {
+    const at = pages.findIndex((p) => p.id === id)
+    if (at < 0) return
+    const gone = pages[at]
+    setPages((prev) => prev.filter((p) => p.id !== id))
+    toast(`ลบหน้า ${at + 1} แล้ว`, { action: { label: 'ย้อนกลับ', onClick: () => setPages((prev) => { const next = [...prev]; next.splice(Math.min(at, next.length), 0, gone); return next }) } })
+  }
+  const clearAll = () => {
+    const all = pages
+    setPages([])
+    toast(`ล้างทุกหน้า (${all.length} หน้า) ออกจากงานแล้ว`, { action: { label: 'ย้อนกลับ', onClick: () => setPages(all) } })
+  }
 
   return (
     <div
@@ -575,7 +612,7 @@ function Workspace({ tool, onOpen, pages, setPages, addFiles, busy, error, onExp
           <button className="btn" disabled={!pages.length} onClick={() => setPages((p) => p.map((x) => ({ ...x, rotation: (x.rotation + 90) % 360 })))} aria-label="หมุนทุกหน้า 90 องศา" title="หมุนทุกหน้า 90 องศา">
             <Icon name="rotate" /> <span className="lbl">หมุนทั้งหมด</span>
           </button>
-          <button className="btn" disabled={!pages.length} onClick={() => setPages([])} aria-label="ล้างทุกหน้าออกจากงานนี้" title="ล้างทุกหน้าออกจากงานนี้">
+          <button className="btn" disabled={!pages.length} onClick={clearAll} aria-label="ล้างทุกหน้าออกจากงานนี้" title="ล้างทุกหน้าออกจากงานนี้">
             <Icon name="trash" /> <span className="lbl">ล้างทั้งหมด</span>
           </button>
         </div>
@@ -721,7 +758,7 @@ function ResultModal({ result, pageCount, pages, sources, onClose, onClear }) {
           <div><dt>เวลาที่ใช้</dt><dd>{(result.ms / 1000).toFixed(2)} วินาที</dd></div>
         </dl>
         <div className="modal-actions">
-          <button className="btn primary" onClick={() => named.forEach((f, i) => setTimeout(() => downloadBlob(f), i * 250))}>
+          <button className="btn primary" onClick={() => { named.forEach((f, i) => setTimeout(() => downloadBlob(f), i * 250)); toast(named.length === 1 ? `เริ่มดาวน์โหลด “${named[0].name}” แล้ว` : `เริ่มดาวน์โหลด ${named.length} ไฟล์แล้ว`) }}>
             <Icon name="download" /> ดาวน์โหลด PDF
           </button>
           <button className="btn" onClick={onClose}>แก้ไขต่อ</button>

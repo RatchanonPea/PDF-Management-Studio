@@ -5,6 +5,7 @@ import { SIGN_FONTS, FONTS, CUSTOM_FONTS, getFont, fontStack } from './fonts.js'
 import { FontSelect, TextInspector } from './TextInspector.jsx'
 import { plain, applyStyle, stylesIn, replaceText } from './rich.js'
 import { Select } from './Select.jsx'
+import { toast } from './toast.jsx'
 import { Tip } from './Tip.jsx'
 import { ColorField } from './ColorField.jsx'
 import { detectBoxes, boxToPng, cropBox, boxFrame, accentOf, markOnBox, recolorBox, boxColors, nearest, MARK_STYLES } from './checkboxes.js'
@@ -226,6 +227,7 @@ export function Editor({ tab, onTab, onBack, onDirty, pages, sources, addFiles, 
     h.future.push(h.last)
     apply(h.past.pop())
     setCan({ undo: h.past.length > 0, redo: true })
+    toast('ย้อนกลับแล้ว', { type: 'info', duration: 1500 })
   }
   const redo = () => {
     const h = hist.current
@@ -234,6 +236,7 @@ export function Editor({ tab, onTab, onBack, onDirty, pages, sources, addFiles, 
     h.past.push(h.last)
     apply(h.future.pop())
     setCan({ undo: true, redo: h.future.length > 0 })
+    toast('ทำซ้ำแล้ว', { type: 'info', duration: 1500 })
   }
   // the floating toolbar follows the selected text / picture on the page
   const [tbPos, setTbPos] = useState(null)
@@ -413,15 +416,23 @@ export function Editor({ tab, onTab, onBack, onDirty, pages, sources, addFiles, 
   const here = items.filter((s) => s.pageId === page.id)
   const sel = here.find((s) => s.id === selected)
   const patch = (id, change) => setItems((prev) => prev.map((s) => (s.id === id ? { ...s, ...change } : s)))
-  const remove = (id) => { setItems((p) => p.filter((s) => s.id !== id)); setSelected(null) }
+  const remove = (id) => {
+    const gone = items.find((s) => s.id === id)
+    setItems((p) => p.filter((s) => s.id !== id))
+    setSelected(null)
+    if (!gone) return
+    // checkbox toggles are restored by clicking them again; the toast offers the same for everything else
+    toast(gone.box ? 'คืนค่าช่องเดิมแล้ว' : gone.run ? 'คืนข้อความเดิมแล้ว' : gone.kind === 'text' ? 'ลบข้อความแล้ว' : 'ลบรูปแล้ว', gone.box ? { type: 'info' } : { action: { label: 'ย้อนกลับ', onClick: () => undoRef.current.undo() } })
+  }
   // for the Delete / Escape keys (the key handler lives above the early return, so it reaches these through a ref)
   undoRef.current.removeSelected = () => { if (!sel) return false; remove(sel.id); return true }
   undoRef.current.deselect = () => { if (!sel) return false; setSelected(null); return true }
 
-  const addImage = ({ dataUrl, ratio, w = 0.25 }) => {
+  const addImage = ({ dataUrl, ratio, w = 0.25, notice = 'เพิ่มรูปภาพแล้ว' }) => {
     const id = nextId()
     setItems((prev) => [...prev, { id, kind: 'image', pageId: page.id, dataUrl, ratio, x: 0.35, y: 0.65, w }])
     setSelected(id)
+    toast(notice)
   }
 
   const addText = async (base) => {
@@ -435,6 +446,7 @@ export function Editor({ tab, onTab, onBack, onDirty, pages, sources, addFiles, 
     if (item.run) item.initial = lookKey(item)
     setItems((prev) => [...prev, item])
     setSelected(id)
+    if (base.notice) toast(base.notice)
   }
 
   const editItem = async (item, change) => {
@@ -518,6 +530,7 @@ export function Editor({ tab, onTab, onBack, onDirty, pages, sources, addFiles, 
       x: f.x, y: f.y, w: f.w,
       cover: { x: f.x - pad, y: f.y - pad * 0.7, w: f.w + pad * 2, h: f.h + pad * 1.4, color: b.bg },
     }])
+    toast(b.checked ? 'ยกเลิกติ๊กช่องแล้ว' : 'ติ๊กช่องแล้ว', { type: 'info', duration: 1800 })
   }
 
   const dragItem = (e, s) => {
@@ -646,7 +659,7 @@ export function Editor({ tab, onTab, onBack, onDirty, pages, sources, addFiles, 
         <div className="panel-body" key={tab}>
           {tab === 'sign' && (
             <>
-              <SignaturePad pen={pen} onInsert={addImage} />
+              <SignaturePad pen={pen} onInsert={(o) => addImage({ ...o, notice: 'เพิ่มลายเซ็นแล้ว' })} />
               <div className="field">
                 <span className="label">สีปากกา</span>
                 <div className="pens">
@@ -668,7 +681,7 @@ export function Editor({ tab, onTab, onBack, onDirty, pages, sources, addFiles, 
                 <label className="label" htmlFor="signname">หรือพิมพ์ชื่อเป็นลายเซ็น</label>
                 <input id="signname" className="text" value={signName} onChange={(e) => setSignName(e.target.value)} placeholder="ชื่อ-นามสกุล" style={{ fontFamily: fontStack(signFont), fontSize: 22 }} />
                 <FontSelect value={signFont} onChange={setSignFont} ids={SIGN_FONTS} label="แบบลายเซ็น" />
-                <button className="btn" disabled={!signName.trim()} onClick={() => { addText({ text: signName.trim(), font: signFont, color: pen, size: 36 }); setSignName('') }}>
+                <button className="btn" disabled={!signName.trim()} onClick={() => { addText({ text: signName.trim(), font: signFont, color: pen, size: 36, notice: 'เพิ่มลายเซ็นแล้ว' }); setSignName('') }}>
                   <Icon name="plus" /> วางลายเซ็นที่พิมพ์
                 </button>
               </div>
@@ -681,7 +694,7 @@ export function Editor({ tab, onTab, onBack, onDirty, pages, sources, addFiles, 
                 <label className="label" htmlFor="newtext">พิมพ์ข้อความลงบนหน้านี้</label>
                 <textarea id="newtext" className="text" rows="3" placeholder="พิมพ์ที่นี่ เช่น ชื่อ วันที่ หมายเหตุ" value={draft} onChange={(e) => setDraft(e.target.value)} style={{ fontFamily: fontStack(draftFont) }} />
                 <FontSelect value={draftFont} onChange={setDraftFont} label="ฟอนต์" />
-                <button className="btn primary" disabled={!draft.trim()} onClick={() => { addText({ text: draft.trim(), font: draftFont }); setDraft('') }}>
+                <button className="btn primary" disabled={!draft.trim()} onClick={() => { addText({ text: draft.trim(), font: draftFont, notice: 'เพิ่มข้อความแล้ว' }); setDraft('') }}>
                   <Icon name="plus" /> วางข้อความบนหน้า
                 </button>
               </div>

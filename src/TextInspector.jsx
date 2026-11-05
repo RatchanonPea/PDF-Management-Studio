@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Icon } from './icons.jsx'
 import { Select } from './Select.jsx'
+import { toast } from './toast.jsx'
 import { ColorField } from './ColorField.jsx'
 import { FONTS, CUSTOM_FONTS, getFont, fontStack, importFont } from './fonts.js'
 import { plain, applyStyle, stylesIn, toHtml, parseDom, readSelection, writeSelection } from './rich.js'
@@ -14,9 +15,12 @@ export function FontSelect({ value, onChange, ids, label }) {
     if (!f) return
     try {
       setErr('')
-      onChange((await importFont(f)).id)
+      const font = await importFont(f)
+      onChange(font.id)
+      toast(`เพิ่มฟอนต์ “${font.label}” แล้ว`)
     } catch {
       setErr('ใช้ไฟล์ฟอนต์นี้ไม่ได้ ลองไฟล์ .ttf .otf .woff หรือ .woff2')
+      toast('ใช้ไฟล์ฟอนต์นี้ไม่ได้ ลองไฟล์ .ttf .otf .woff หรือ .woff2', { type: 'error' })
     }
   }
   return (

@@ -657,6 +657,34 @@ html { scroll-behavior: smooth; }
 .tb-slider { display: inline-flex; align-items: center; gap: 10px; padding: 0 6px; font-weight: 600; }
 .tb-slider input { width: 180px; }
 .textbar .icon-btn { width: 36px; height: 36px; }
+/* ---------- notifications (toasts) and our own confirm dialog ---------- */
+.toasts { position: fixed; z-index: 90; left: 50%; bottom: 24px; transform: translateX(-50%); display: grid; gap: 10px; width: min(460px, calc(100vw - 24px)); pointer-events: none; }
+.toast { position: relative; overflow: hidden; pointer-events: auto; display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 10px; padding: 10px 8px 10px 12px; background: var(--ink); color: #fff; border-radius: 14px; box-shadow: 0 18px 36px -14px rgba(19, 28, 51, .7), 0 2px 6px rgba(19, 28, 51, .2); animation: toast-in .32s var(--ease-pop) backwards; }
+.toast.is-leaving { animation: toast-out .22s var(--ease) forwards; }
+.toast::after { content: ''; position: absolute; left: 0; bottom: 0; height: 3px; width: 100%; background: var(--tone); transform-origin: left; animation: toast-time var(--dur) linear forwards; opacity: .9; }
+.toast.is-paused::after { animation-play-state: paused; }
+.toast.success { --tone: #34D399; }
+.toast.info { --tone: #7DB4FF; }
+.toast.warn { --tone: #FBBF24; }
+.toast.error { --tone: #FB7185; }
+.toast-ico { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: color-mix(in srgb, var(--tone) 22%, transparent); color: var(--tone); }
+.toast-msg { font-weight: 500; line-height: 1.4; overflow-wrap: anywhere; }
+.toast-act { padding: 6px 12px; border: 0; border-radius: 8px; background: rgba(255, 255, 255, .14); color: #fff; font-weight: 600; transition: background-color .15s, transform .1s; }
+.toast-act:hover { background: rgba(255, 255, 255, .26); }
+.toast-act:active { transform: scale(.95); }
+.toast-x { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 8px; background: none; color: rgba(255, 255, 255, .6); transition: background-color .15s, color .15s; }
+.toast-x:hover { background: rgba(255, 255, 255, .14); color: #fff; }
+@keyframes toast-in { from { opacity: 0; transform: translateY(18px) scale(.94); } to { opacity: 1; transform: none; } }
+@keyframes toast-out { to { opacity: 0; transform: translateY(8px) scale(.96); } }
+@keyframes toast-time { to { transform: scaleX(0); } }
+@media (max-width: 900px) { .toasts { bottom: auto; top: 72px; } .toast { animation-name: drop-in; } }
+
+.confirm { max-width: 400px; }
+.confirm-ico { display: grid; place-items: center; width: 56px; height: 56px; margin: 0 auto; border-radius: 18px; background: var(--stamp-tint); color: var(--stamp); }
+.confirm-ico.danger { background: #FFE9E4; color: var(--seal); }
+.btn.danger-solid { background: var(--seal); border-color: var(--seal); color: #fff; }
+.btn.danger-solid:hover:not(:disabled) { background: #A82620; border-color: #A82620; }
+
 .textbar .tb-del { color: var(--seal); border-color: #F0C4C0; }
 .textbar .tb-del:hover:not(:disabled) { background: #FFE9E4; border-color: var(--seal); color: var(--seal); }
 .fmt .thin { font: 300 14px/1 var(--body); }
