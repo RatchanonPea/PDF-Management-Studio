@@ -657,6 +657,8 @@ html { scroll-behavior: smooth; }
 .tb-slider { display: inline-flex; align-items: center; gap: 10px; padding: 0 6px; font-weight: 600; }
 .tb-slider input { width: 180px; }
 .textbar .icon-btn { width: 36px; height: 36px; }
+.textbar .tb-del { color: var(--seal); border-color: #F0C4C0; }
+.textbar .tb-del:hover:not(:disabled) { background: #FFE9E4; border-color: var(--seal); color: var(--seal); }
 .fmt .thin { font: 300 14px/1 var(--body); }
 .fmt { flex-wrap: wrap; max-width: 100%; }
 /* one wide control must never push the whole side panel wider than its column */

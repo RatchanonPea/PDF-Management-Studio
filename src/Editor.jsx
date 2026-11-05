@@ -291,9 +291,17 @@ export function Editor({ tab, onTab, onBack, onDirty, pages, sources, addFiles, 
   useEffect(() => {
     const key = (e) => {
       if (!root.current || root.current.offsetParent === null) return // the editor is not on screen
-      if (!(e.ctrlKey || e.metaKey) || e.altKey) return
       const t = e.target
-      if (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return // typing keeps its own undo
+      const typing = t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)
+      // Delete / Backspace remove what is selected (a line that was clicked goes back to the original); Esc lets go of it
+      if (!typing && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        // Backspace only when nothing else has the focus, so it cannot fire from a button the user just used
+        const idle = t === document.body || !!t.closest?.('.stage-scroll')
+        if ((e.key === 'Delete' || (e.key === 'Backspace' && idle)) && undoRef.current.removeSelected?.()) { e.preventDefault(); return }
+        if (e.key === 'Escape' && undoRef.current.deselect?.()) return
+      }
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return
+      if (typing) return // typing keeps its own undo
       const k = e.key.toLowerCase()
       if (k === 'z' && !e.shiftKey) { e.preventDefault(); undoRef.current.undo() }
       else if ((k === 'z' && e.shiftKey) || k === 'y') { e.preventDefault(); undoRef.current.redo() }
@@ -406,6 +414,9 @@ export function Editor({ tab, onTab, onBack, onDirty, pages, sources, addFiles, 
   const sel = here.find((s) => s.id === selected)
   const patch = (id, change) => setItems((prev) => prev.map((s) => (s.id === id ? { ...s, ...change } : s)))
   const remove = (id) => { setItems((p) => p.filter((s) => s.id !== id)); setSelected(null) }
+  // for the Delete / Escape keys (the key handler lives above the early return, so it reaches these through a ref)
+  undoRef.current.removeSelected = () => { if (!sel) return false; remove(sel.id); return true }
+  undoRef.current.deselect = () => { if (!sel) return false; setSelected(null); return true }
 
   const addImage = ({ dataUrl, ratio, w = 0.25 }) => {
     const id = nextId()
@@ -790,8 +801,8 @@ export function Editor({ tab, onTab, onBack, onDirty, pages, sources, addFiles, 
                   <input id="size" type="range" min="0.05" max="0.9" step="0.01" value={sel.w} onChange={(e) => patch(sel.id, { w: Math.min(+e.target.value, 1 - sel.x) })} />
                 </>
               )}
-              <button className={sel.run ? 'btn' : 'btn danger'} onClick={() => remove(sel.id)}>
-                <Icon name={sel.run ? 'undo' : 'trash'} /> {sel.run ? 'คืนข้อความเดิม' : 'ลบรายการนี้'}
+              <button className="btn danger" onClick={() => remove(sel.id)} title={sel.run ? 'ลบการแก้ไข ข้อความจะกลับเป็นต้นฉบับ' : undefined}>
+                <Icon name="trash" /> ลบรายการนี้
               </button>
             </div>
           )}
@@ -842,8 +853,8 @@ export function Editor({ tab, onTab, onBack, onDirty, pages, sources, addFiles, 
               <input type="range" min="0.05" max="0.9" step="0.01" value={sel.w} aria-label="ขนาดรูป" onChange={(e) => patch(sel.id, { w: Math.min(+e.target.value, 1 - sel.x) })} />
             </label>
           )}
-          <button className="icon-btn" onClick={() => remove(sel.id)} aria-label={sel.run ? 'คืนข้อความเดิม' : 'ลบรายการนี้'} title={sel.run ? 'คืนข้อความเดิม' : 'ลบรายการนี้'}>
-            <Icon name={sel.run ? 'undo' : 'trash'} size={18} />
+          <button className="icon-btn tb-del" onClick={() => remove(sel.id)} aria-label="ลบรายการนี้" title={sel.run ? 'ลบ (ข้อความจะกลับเป็นต้นฉบับ) · Delete' : 'ลบ · Delete'}>
+            <Icon name="trash" size={18} />
           </button>
         </div>
       )}
