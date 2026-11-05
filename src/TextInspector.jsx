@@ -1,5 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Icon } from './icons.jsx'
+import { Select } from './Select.jsx'
+import { ColorField } from './ColorField.jsx'
 import { FONTS, CUSTOM_FONTS, getFont, fontStack, importFont } from './fonts.js'
 import { plain, applyStyle, stylesIn, toHtml, parseDom, readSelection, writeSelection } from './rich.js'
 
@@ -21,11 +23,7 @@ export function FontSelect({ value, onChange, ids, label }) {
     <div className="font-select">
       <span className="label">{label}</span>
       <div className="font-row">
-        <select className="text" value={value} onChange={(e) => onChange(e.target.value)} style={{ fontFamily: fontStack(value) }} aria-label={label}>
-          {list.map((f) => (
-            <option key={f.id} value={f.id} style={{ fontFamily: fontStack(f.id) }}>{f.label}</option>
-          ))}
-        </select>
+        <Select value={value} onChange={onChange} label={label} options={list.map((f) => ({ id: f.id, label: f.label, style: { fontFamily: fontStack(f.id) } }))} />
         <label className="btn" title="Import ไฟล์ฟอนต์จากเครื่อง (.ttf .otf .woff .woff2)">
           <Icon name="upload" size={18} /> Import font
           <input type="file" accept=".ttf,.otf,.woff,.woff2,font/*" hidden onChange={pick} />
@@ -98,7 +96,7 @@ const keep = (e) => e.preventDefault() // keep the text selection while a toolba
  * Word-style editing of one text item. Formatting applies to the highlighted characters only;
  * with nothing highlighted it applies to the whole box.
  */
-export function TextInspector({ item, onEdit, pens }) {
+export function TextInspector({ item, onEdit, pens, onUndo, onRedo }) {
   const root = useRef(null)
   const emitted = useRef('')
   const [sel, setSel] = useState({ a: 0, b: 0 })
@@ -135,7 +133,8 @@ export function TextInspector({ item, onEdit, pens }) {
   }
 
   const edit = (runs) => onEdit({ runs, text: plain(runs) })
-  const toggle = (k) => total && edit(applyStyle(item.runs, a, b, { [k]: styles.every((s) => s[k]) ? undefined : true }))
+  // bold and light exclude each other
+  const toggle = (k) => total && edit(applyStyle(item.runs, a, b, { [k]: styles.every((s) => s[k]) ? undefined : true, ...(k === 'b' ? { l: undefined } : k === 'l' ? { b: undefined } : {}) }))
   // font / colour / size: the selection only, or the whole box (and reset per-run overrides) when nothing is selected
   const setProp = (k, v) =>
     ranged ? edit(applyStyle(item.runs, a, b, { [k]: v })) : onEdit({ [k]: v, runs: applyStyle(item.runs, 0, total, { [k]: undefined }) })
@@ -143,7 +142,11 @@ export function TextInspector({ item, onEdit, pens }) {
   const onKeyDown = (e) => {
     if (e.key === 'Enter') { e.preventDefault(); document.execCommand('insertLineBreak'); return }
     if (!(e.ctrlKey || e.metaKey)) return
-    const k = { b: 'b', i: 'i', u: 'u' }[e.key.toLowerCase()]
+    const key = e.key.toLowerCase()
+    // undo / redo go through the page history, so a whole edit can be undone, not just the last letters
+    if (key === 'z' && !e.shiftKey) { e.preventDefault(); onUndo?.(); return }
+    if ((key === 'z' && e.shiftKey) || key === 'y') { e.preventDefault(); onRedo?.(); return }
+    const k = { b: 'b', i: 'i', u: 'u' }[key]
     if (k) { e.preventDefault(); toggle(k) }
   }
   const onPaste = (e) => {
@@ -155,7 +158,7 @@ export function TextInspector({ item, onEdit, pens }) {
   }
 
   const colour = first.color || item.color
-  const fmt = [['b', <b>B</b>, 'ตัวหนา (Ctrl+B)'], ['i', <i>I</i>, 'ตัวเอียง (Ctrl+I)'], ['u', <u>U</u>, 'ขีดเส้นใต้ (Ctrl+U)'], ['s', <s>S</s>, 'ขีดฆ่า']]
+  const fmt = [['b', <b>B</b>, 'ตัวหนา (Ctrl+B)'], ['i', <i>I</i>, 'ตัวเอียง (Ctrl+I)'], ['u', <u>U</u>, 'ขีดเส้นใต้ (Ctrl+U)'], ['s', <s>S</s>, 'ขีดฆ่า'], ['l', <span className="thin">บาง</span>, 'ตัวบาง']]
 
   return (
     <>
@@ -197,6 +200,7 @@ export function TextInspector({ item, onEdit, pens }) {
           <button key={c} className={colour === c ? 'on' : ''} style={{ '--pen': c }} onMouseDown={keep} onClick={() => setProp('color', c)} aria-label={c} aria-pressed={colour === c} />
         ))}
       </div>
+      <ColorField id="textcolor" label="สีข้อความ" value={colour} onChange={(c) => setProp('color', c)} />
     </>
   )
 }

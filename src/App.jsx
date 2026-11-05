@@ -4,15 +4,24 @@ import { Icon } from './icons.jsx'
 import { Editor } from './Editor.jsx'
 
 const TOOLS = [
-  { id: 'merge', view: 'workspace', icon: 'merge', title: 'รวม / แยกไฟล์', en: 'Merge & Split', desc: 'ต่อ PDF หลายไฟล์เป็นไฟล์เดียว หรือแยกทีละหน้า' },
-  { id: 'organize', view: 'workspace', icon: 'grid', title: 'จัดเรียง / หมุนหน้า', en: 'Organize & Rotate', desc: 'ลากสลับลำดับ หมุน หรือลบหน้าที่ไม่ต้องการ' },
-  { id: 'sign', view: 'editor', tab: 'sign', icon: 'pen', title: 'เซ็นชื่อ / ประทับตรา', en: 'E-Sign & Stamp', desc: 'วาดหรืออัปโหลดลายเซ็น แล้วลากวางบนหน้า PDF' },
-  { id: 'text', view: 'editor', tab: 'text', icon: 'type', title: 'พิมพ์ข้อความ', en: 'Add Text', desc: 'พิมพ์ข้อความใหม่ลงบนหน้า เลือกขนาดและสี ลากวางได้' },
-  { id: 'image', view: 'editor', tab: 'image', icon: 'image', title: 'แทรกรูปภาพ', en: 'Add Image', desc: 'นำรูปภาพ โลโก้ หรือรูปถ่ายเข้ามาวางบนหน้า PDF' },
-  { id: 'edit', view: 'editor', tab: 'edit', icon: 'edit', title: 'แก้ข้อความเดิม', en: 'Edit Existing Text', desc: 'คลิกข้อความที่มีอยู่ใน PDF แล้วแก้ไขได้ทันที' },
-  { id: 'watermark', view: 'editor', tab: 'watermark', icon: 'drop', title: 'ใส่ลายน้ำ', en: 'Watermark', desc: 'ใส่ข้อความ เช่น “สำเนาถูกต้อง” ทับทุกหน้า' },
-  { id: 'protect', view: 'protect', icon: 'lock', title: 'ตั้ง / ปลดรหัสผ่าน', en: 'Protect & Unlock', desc: 'ตั้งรหัสผ่านก่อนดาวน์โหลด หรือเปิดไฟล์ที่ล็อกด้วยรหัสเดิม' },
+  { id: 'merge', tone: 'blue', view: 'workspace', icon: 'merge', title: 'รวม / แยกไฟล์', en: 'Merge & Split', desc: 'ต่อ PDF หลายไฟล์เป็นไฟล์เดียว หรือแยกทีละหน้า' },
+  { id: 'organize', tone: 'violet', view: 'workspace', icon: 'grid', title: 'จัดเรียง / หมุนหน้า', en: 'Organize & Rotate', desc: 'ลากสลับลำดับ หมุน หรือลบหน้าที่ไม่ต้องการ' },
+  { id: 'sign', tone: 'coral', view: 'editor', tab: 'sign', icon: 'pen', title: 'เซ็นชื่อ / ประทับตรา', en: 'E-Sign & Stamp', desc: 'วาดหรืออัปโหลดลายเซ็น แล้วลากวางบนหน้า PDF' },
+  { id: 'text', tone: 'amber', view: 'editor', tab: 'text', icon: 'type', title: 'พิมพ์ข้อความ', en: 'Add Text', desc: 'พิมพ์ข้อความใหม่ลงบนหน้า เลือกขนาดและสี ลากวางได้' },
+  { id: 'image', tone: 'mint', view: 'editor', tab: 'image', icon: 'image', title: 'แทรกรูปภาพ', en: 'Add Image', desc: 'นำรูปภาพ โลโก้ หรือรูปถ่ายเข้ามาวางบนหน้า PDF' },
+  { id: 'edit', tone: 'sky', view: 'editor', tab: 'edit', icon: 'edit', title: 'แก้ข้อความเดิม', en: 'Edit Existing Text', desc: 'คลิกข้อความที่มีอยู่ใน PDF แล้วแก้ไขได้ทันที' },
+  { id: 'watermark', tone: 'pink', view: 'editor', tab: 'watermark', icon: 'drop', title: 'ใส่ลายน้ำ', en: 'Watermark', desc: 'ใส่ข้อความ เช่น “สำเนาถูกต้อง” ทับทุกหน้า' },
+  { id: 'protect', tone: 'green', view: 'protect', icon: 'lock', title: 'ตั้ง / ปลดรหัสผ่าน', en: 'Protect & Unlock', desc: 'ตั้งรหัสผ่านก่อนดาวน์โหลด หรือเปิดไฟล์ที่ล็อกด้วยรหัสเดิม' },
 ]
+
+// bits of paper that burst out when a file is ready: horizontal drift, spin, colour and delay
+const CONFETTI = Array.from({ length: 22 }, (_, i) => ({
+  '--x': `${((i * 37) % 200) - 100}px`,
+  '--r': `${((i * 83) % 720) - 360}deg`,
+  '--c': ['#2338D4', '#7B3FE4', '#F0583E', '#E39A00', '#0FA37F', '#E0388F'][i % 6],
+  '--d': `${(i % 7) * 0.04}s`,
+  '--s': `${6 + (i % 4) * 2}px`,
+}))
 
 export default function App() {
   const [view, setView] = useState('home')
@@ -239,8 +248,11 @@ function Home({ onFiles, onOpen, busy, error }) {
   return (
     <>
       <section className="hero">
+        <span className="blob b1" aria-hidden="true" />
+        <span className="blob b2" aria-hidden="true" />
+        <span className="blob b3" aria-hidden="true" />
         <div className="hero-copy">
-          <h1>เครื่องมือจัดการ PDF ฟรี ปลอดภัย ไม่ต้องอัปโหลดขึ้นเซิร์ฟเวอร์</h1>
+          <h1>เครื่องมือจัดการ PDF <span className="hl">ฟรี ปลอดภัย</span> ไม่ต้องอัปโหลดขึ้นเซิร์ฟเวอร์</h1>
           <p>
             ไฟล์ถูกประมวลผลในเบราว์เซอร์ของคุณทั้งหมด ปิดแท็บเมื่อไหร่ ข้อมูลก็หายไปพร้อมกัน
           </p>
@@ -254,7 +266,7 @@ function Home({ onFiles, onOpen, busy, error }) {
           {TOOLS.map((t) => (
             <li key={t.id}>
               <button className="tool-row" onClick={() => onOpen(t)}>
-                <span className="tool-glyph" aria-hidden="true"><Icon name={t.icon} /></span>
+                <span className="tool-glyph" data-tone={t.tone} aria-hidden="true"><Icon name={t.icon} /></span>
                 <span className="tool-name">
                   {t.title}
                   <small>{t.en}</small>
@@ -289,7 +301,7 @@ function DropSheet({ onFiles, busy, error }) {
       onDrop={(e) => { e.preventDefault(); setOver(false); onFiles(e.dataTransfer.files) }}
     >
       <div className="sheet-inner">
-        <p className="sheet-title">{busy ? 'กำลังอ่านไฟล์…' : 'วางไฟล์ PDF ที่นี่'}</p>
+        <p className="sheet-title">{busy && <span className="spin" aria-hidden="true" />}{busy ? 'กำลังอ่านไฟล์…' : 'วางไฟล์ PDF ที่นี่'}</p>
         <p className="sheet-sub">เลือกได้หลายไฟล์พร้อมกัน</p>
         <button className="btn primary" onClick={() => input.current.click()} disabled={busy}>
           <Icon name="plus" /> เลือกไฟล์ PDF
@@ -308,7 +320,7 @@ function DropSheet({ onFiles, busy, error }) {
           <rect x="4" y="4" width="212" height="88" rx="6" strokeWidth="4" />
           <rect x="11" y="11" width="198" height="74" rx="3" strokeWidth="1.5" />
         </g>
-        <g filter="url(#ink)" fill="currentColor" textAnchor="middle" fontFamily="Bai Jamjuree, Sarabun, sans-serif" fontWeight="700">
+        <g filter="url(#ink)" fill="currentColor" textAnchor="middle" fontFamily="Prompt, Sarabun, sans-serif" fontWeight="700">
           <text x="110" y="45" fontSize="22">ประมวลผล</text>
           <text x="110" y="72" fontSize="22">ในเครื่องนี้</text>
         </g>
@@ -319,6 +331,9 @@ function DropSheet({ onFiles, busy, error }) {
 
 function ToolFab({ tool, pages, onOpen }) {
   const [open, setOpen] = useState(false)
+  // a highlight that glides to whichever row is pointed at or focused
+  const [ind, setInd] = useState({ y: 0, h: 0, on: false, fresh: true })
+  const aim = (row) => setInd((prev) => ({ y: row.offsetTop, h: row.offsetHeight, on: true, fresh: !prev.on }))
   const ref = useRef(null)
 
   useEffect(() => {
@@ -334,11 +349,12 @@ function ToolFab({ tool, pages, onOpen }) {
   return (
     <div className="fab" ref={ref}>
       {open && (
-        <ul className="fab-menu" role="menu" aria-label="เลือกเครื่องมือ">
+        <ul className="fab-menu" role="menu" aria-label="เลือกเครื่องมือ" onMouseLeave={() => setInd((i) => ({ ...i, on: false }))}>
+          <li className={`fab-ind ${ind.fresh ? 'fresh' : ''}`} role="presentation" aria-hidden="true" style={{ transform: `translateY(${ind.y}px)`, height: ind.h, opacity: ind.on ? 1 : 0 }} />
           {TOOLS.filter((t) => t.id !== tool.id).map((t) => (
-            <li key={t.id} role="none">
-              <button role="menuitem" onClick={() => { setOpen(false); onOpen(t) }}>
-                <span className="tool-glyph" aria-hidden="true"><Icon name={t.icon} /></span>
+            <li key={t.id} role="none" onMouseEnter={(e) => aim(e.currentTarget)}>
+              <button role="menuitem" onFocus={(e) => aim(e.currentTarget.parentElement)} onBlur={() => setInd((i) => ({ ...i, on: false }))} onClick={() => { setOpen(false); onOpen(t) }}>
+                <span className="tool-glyph" data-tone={t.tone} aria-hidden="true"><Icon name={t.icon} /></span>
                 <span><b>{t.title}</b><small>{t.desc}</small></span>
               </button>
             </li>
@@ -377,6 +393,7 @@ function Library({ library, pages, draftPages, busy, error, addFiles, onWork, on
       {error && <p className="error banner" role="alert">{error}</p>}
       {!library.length ? (
         <div className="empty">
+          <span className="empty-art" aria-hidden="true"><Icon name="sheet" size={34} /></span>
           <p className="sheet-title">ยังไม่มีไฟล์ในคลัง</p>
           <p>ไฟล์ที่เปิดไว้ในเซสชันนี้จะมาอยู่ที่นี่ กลับมาเปิดทำต่อได้โดยไม่ต้องเลือกไฟล์ใหม่</p>
         </div>
@@ -484,6 +501,7 @@ function Protect({ pages, sources, addFiles, busy, error, onExport }) {
       {error && <p className="error banner" role="alert">{error}</p>}
       {!pages.length ? (
         <div className="empty">
+          <span className="empty-art" aria-hidden="true"><Icon name="sheet" size={34} /></span>
           <p className="sheet-title">{busy ? 'กำลังอ่านไฟล์…' : 'ยังไม่มีไฟล์'}</p>
           <p>เพิ่มไฟล์ PDF ปกติเพื่อตั้งรหัสผ่าน หรือไฟล์ที่ล็อกอยู่เพื่อปลดล็อก (ต้องทราบรหัสเดิม)</p>
         </div>
@@ -567,7 +585,7 @@ function Workspace({ tool, onOpen, pages, setPages, addFiles, busy, error, onExp
             <button role="radio" aria-checked={mode === 'split'} className={mode === 'split' ? 'on' : ''} onClick={() => setMode('split')}>แยกทีละหน้า</button>
           </div>
           <button className="btn primary" disabled={!pages.length || busy} onClick={() => onExport(mode, {})}>
-            <Icon name="download" /> {busy ? 'กำลังสร้างไฟล์…' : 'สร้างและดาวน์โหลด'}
+            {busy ? <span className="spin" aria-hidden="true" /> : <Icon name="download" />} {busy ? 'กำลังสร้างไฟล์…' : 'สร้างและดาวน์โหลด'}
           </button>
         </div>
       </div>
@@ -576,6 +594,7 @@ function Workspace({ tool, onOpen, pages, setPages, addFiles, busy, error, onExp
 
       {pages.length === 0 ? (
         <div className="empty">
+          <span className="empty-art" aria-hidden="true"><Icon name="sheet" size={34} /></span>
           <p className="sheet-title">{busy ? 'กำลังอ่านไฟล์…' : 'ยังไม่มีหน้า PDF'}</p>
           <p>ลากไฟล์มาวางตรงนี้ หรือกด “เพิ่มไฟล์ PDF” ด้านบน</p>
         </div>
@@ -670,6 +689,9 @@ function ResultModal({ result, pageCount, pages, sources, onClose, onClear }) {
   return (
     <div className="scrim" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className={`modal ${compare ? 'wide' : ''}`} role="dialog" aria-modal="true" aria-labelledby="done-h">
+        <div className="confetti" aria-hidden="true">
+          {CONFETTI.map((c, i) => <i key={i} style={c} />)}
+        </div>
         <svg className="check" viewBox="0 0 52 52" aria-hidden="true">
           <circle cx="26" cy="26" r="24" />
           <path d="M15 27l8 8 14-16" />

@@ -1,7 +1,7 @@
 import { fontStack } from './fonts.js'
 
 // A rich text item is a list of runs: { t, b, i, u, s, color, font, size }. Anything unset inherits the item's own value.
-const KEYS = ['b', 'i', 'u', 's', 'color', 'font', 'size']
+const KEYS = ['b', 'i', 'u', 's', 'l', 'color', 'font', 'size'] // l = light (thin) weight
 const same = (a, b) => KEYS.every((k) => a[k] === b[k])
 const styleOf = (r) => Object.fromEntries(KEYS.filter((k) => r[k] !== undefined && r[k] !== false).map((k) => [k, r[k]]))
 
@@ -55,7 +55,7 @@ export function toHtml(runs, base) {
       `font-family:${fontStack(st.font || base.font)}`,
       `font-size:${(st.size || base.size) / base.size}em`,
       st.color ? `color:${st.color}` : '',
-      st.b ? 'font-weight:700' : '',
+      st.b ? 'font-weight:700' : st.l ? 'font-weight:300' : '',
       st.i ? 'font-style:italic' : '',
       st.u || st.s ? `text-decoration:${[st.u && 'underline', st.s && 'line-through'].filter(Boolean).join(' ')}` : '',
     ].filter(Boolean).join(';')

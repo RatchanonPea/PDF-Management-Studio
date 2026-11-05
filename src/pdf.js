@@ -5,6 +5,23 @@ import { encryptPDF } from '@pdfsmaller/pdf-encrypt-lite'
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl
 
+// Older Thai fonts store raised / lowered / shifted marks as private-use codes (U+F700..). Plain fonts have no glyph for
+// them (they show as empty boxes), so they are turned back into the ordinary Thai marks.
+const THAI_PUA = {
+  0xf700: 0x0e10, 0xf701: 0x0e34, 0xf702: 0x0e35, 0xf703: 0x0e36, 0xf704: 0x0e37,
+  0xf705: 0x0e48, 0xf706: 0x0e49, 0xf707: 0x0e4a, 0xf708: 0x0e4b, 0xf709: 0x0e4c,
+  0xf70a: 0x0e48, 0xf70b: 0x0e49, 0xf70c: 0x0e4a, 0xf70d: 0x0e4b, 0xf70e: 0x0e4c,
+  0xf70f: 0x0e0d, 0xf710: 0x0e31, 0xf711: 0x0e4d,
+  0xf712: 0x0e48, 0xf713: 0x0e49, 0xf714: 0x0e4a, 0xf715: 0x0e4b, 0xf716: 0x0e4c,
+  0xf717: 0x0e47, 0xf718: 0x0e48, 0xf719: 0x0e49, 0xf71a: 0x0e4a,
+}
+export const cleanThai = (s) =>
+  s.replace(/[\ue000-\uf8ff\u200b-\u200d\ufeff]/g, (c) => (THAI_PUA[c.charCodeAt(0)] ? String.fromCharCode(THAI_PUA[c.charCodeAt(0)]) : ''))
+
+// Some fonts draw a tone mark with a glyph that has no Unicode mapping; pdf.js then reports it as NUL. Which tone it was
+// cannot be read from the file, so a likely one is put in and the editor warns about it.
+export const guessMarks = (s) => s.replace(/(.)?\u0000/g, (_, prev) => (prev ? prev : '') + (prev && /[ัิ-ื]/.test(prev) ? '่' : '้'))
+
 let uid = 0
 export const nextId = () => `p${++uid}`
 
@@ -12,7 +29,7 @@ export const needsPassword = (e) => e?.name === 'PasswordException'
 
 export async function loadFile(file, password) {
   const bytes = new Uint8Array(await file.arrayBuffer())
-  const doc = await pdfjs.getDocument({ data: bytes.slice(), password }).promise
+  const doc = await pdfjs.getDocument({ data: bytes.slice(), password, fontExtraProperties: true }).promise
   // pdf-lib cannot decrypt, so an unlocked file is re-drawn from pdf.js on export
   return { id: nextId(), name: file.name, bytes, doc, unlocked: password !== undefined }
 }
@@ -35,11 +52,23 @@ export async function getTextRuns(doc, pageIndex) {
   const page = await doc.getPage(pageIndex + 1)
   const vp = page.getViewport({ scale: 1 })
   const { items } = await page.getTextContent()
+  // fonts are resolved once the page's operators are read; their flags tell bold / italic
+  await page.getOperatorList().catch(() => {})
+  const look = (name) => {
+    try {
+      if (!page.commonObjs.has(name)) return {}
+      const f = page.commonObjs.get(name)
+      const n = f.name || ''
+      const fam = n.replace(/^[A-Z]{6}\+/, '').replace(/[-,_ ]?(bold|italic|oblique|regular|black|heavy|light|medium|semibold|demi|psmt|mt|ps)/gi, '').toLowerCase()
+      return { bold: /bold|black|heavy|demi/i.test(n), italic: /italic|oblique/i.test(n), serif: !!f.isSerifFont, fam }
+    } catch { return {} }
+  }
   const raw = items
-    .filter((it) => it.str && it.str.trim())
+    .map((it) => ({ ...it, g: (it.str.match(/\u0000/g) || []).length, str: cleanThai(guessMarks(it.str || '')).replace(/ํา/g, 'ำ') }))
+    .filter((it) => it.str.trim())
     .map((it) => {
       const [, , , , e, f] = pdfjs.Util.transform(vp.transform, it.transform)
-      return { str: it.str, size: Math.hypot(it.transform[2], it.transform[3]), x: e, base: f, w: it.width }
+      return { str: it.str, g: it.g, size: Math.hypot(it.transform[2], it.transform[3]), x: e, base: f, w: it.width, ...look(it.fontName) }
     })
     .sort((a, b) => a.base - b.base || a.x - b.x)
 
@@ -56,14 +85,22 @@ export async function getTextRuns(doc, pageIndex) {
     let cur = null
     for (const r of line.items) {
       const gap = cur ? r.x - (cur.x + cur.w) : 0
-      if (cur && gap < cur.size * 2.5) {
-        const space = gap > cur.size * 0.2 && !/\s$/.test(cur.str) && !/^\s/.test(r.str) ? ' ' : ''
+      // pieces of clearly different size (a heading beside small print) stay separate lines
+      const ratio = cur ? r.size / cur.size : 1
+      // a value typed into a form (smaller, or another typeface) is a separate piece from its label
+      const alike = cur && ratio > 0.88 && ratio < 1.14 && !(r.fam && cur.fam && r.fam !== cur.fam && (ratio < 0.95 || ratio > 1.05))
+      if (cur && alike && gap < cur.size * 2.5) {
+        const space = gap > cur.size * 0.1 && !/\s$/.test(cur.str) && !/^\s/.test(r.str) ? ' ' : ''
+        const n = r.str.length
+        cur.size = (cur.size * cur.len + r.size * n) / (cur.len + n) // by amount of text, so one big glyph does not enlarge the line
+        cur.len += n
+        cur.g += r.g
         cur.str += space + r.str
+        cur.parts.push({ s: space + r.str, x: r.x, w: r.w, g: r.g, bold: r.bold, italic: r.italic })
         cur.w = Math.max(cur.w, r.x + r.w - cur.x)
-        cur.size = Math.max(cur.size, r.size)
       } else {
         if (cur) out.push(cur)
-        cur = { ...r, base: line.base }
+        cur = { ...r, base: line.base, len: r.str.length, parts: [{ s: r.str, x: r.x, w: r.w, g: r.g, bold: r.bold, italic: r.italic }] }
       }
     }
     if (cur) out.push(cur)
@@ -75,7 +112,50 @@ export async function getTextRuns(doc, pageIndex) {
     y: (r.base - r.size * 0.95) / vp.height,
     w: r.w / vp.width,
     h: (r.size * 1.25) / vp.height,
+    base: r.base / vp.height,
+    bold: !!r.bold,
+    italic: !!r.italic,
+    serif: !!r.serif,
+    unknown: r.g,
+    parts: r.parts.map((q) => ({ s: q.s, x: q.x / vp.width, w: q.w / vp.width, g: q.g, bold: !!q.bold, italic: !!q.italic })),
   }))
+}
+
+/**
+ * Text lines that were joined across something drawn between them (a table rule, a checkbox) belong to different
+ * cells: cut them there. `canvas` is a render of the page.
+ */
+export function splitAtRules(runs, canvas) {
+  const W = canvas.width
+  const H = canvas.height
+  const data = canvas.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, W, H).data
+  const dark = (x, y) => { const i = (y * W + x) * 4; return data[i] + data[i + 1] + data[i + 2] < 420 }
+  const out = []
+  for (const r of runs) {
+    if (r.parts.length < 2) { out.push(r); continue }
+    const y0 = Math.max(0, Math.floor((r.y + r.h * 0.15) * H))
+    const y1 = Math.min(H - 1, Math.ceil((r.y + r.h * 0.9) * H))
+    // anything drawn in the gap between two pieces of text (a table rule, a checkbox, a picture) means they are separate
+    const ruleBetween = (a, b) => {
+      const x0 = Math.ceil(a * W) + 2
+      const x1 = Math.floor(b * W) - 2
+      if (x1 - x0 < 3) return false
+      let n = 0
+      for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) if (dark(x, y) && ++n >= 3) return true
+      return false
+    }
+    let group = [r.parts[0]]
+    const flush = () => {
+      const first = group[0], last = group[group.length - 1]
+      out.push({ ...r, str: group.map((q) => q.s).join('').trim(), x: first.x, w: last.x + last.w - first.x, parts: group, unknown: group.reduce((n, q) => n + q.g, 0) })
+    }
+    for (let i = 1; i < r.parts.length; i++) {
+      const prev = r.parts[i - 1], next = r.parts[i]
+      if (ruleBetween(prev.x + prev.w, next.x)) { flush(); group = [next] } else group.push(next)
+    }
+    flush()
+  }
+  return out.filter((r) => r.str)
 }
 
 /** Render page `pageIndex` of a generated PDF blob, for the before/after view. */
@@ -144,9 +224,9 @@ export function textToPng(text, { font, color, size = TEXT_BASE, weight = 700, p
  * Renders rich text: runs of { t, b, i, u, s, color, font, size } on shared baselines.
  * `size` is the item's base size in pt; a run's own size is scaled against it.
  */
-export function richToPng(runs, { stack, color, size, align = 'left', pad = 8 }) {
+export function richToPng(runs, { stack, font, color, size, align = 'left', pad = 8 }) {
   const px = (r) => ((r.size || size) / size) * TEXT_BASE
-  const spec = (r) => `${r.i ? 'italic ' : ''}${r.b ? 700 : 400} ${px(r)}px ${stack(r.font)}`
+  const spec = (r) => `${r.i ? 'italic ' : ''}${r.b ? 700 : r.l ? 300 : 400} ${px(r)}px ${stack(r.font || font)}`
 
   // split runs into lines
   let lines = [[]]
