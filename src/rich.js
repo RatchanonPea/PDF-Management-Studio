@@ -23,6 +23,22 @@ export function fromChars(chars) {
   return runs
 }
 
+/**
+ * Replace the text of a rich text item with `text`, keeping the formatting of everything that did not change:
+ * the common start and end stay as they were, and what was typed takes the style of the character before it.
+ */
+export function replaceText(runs, text) {
+  const old = toChars(runs)
+  const next = [...text]
+  let head = 0
+  while (head < old.length && head < next.length && old[head].ch === next[head]) head++
+  let tail = 0
+  while (tail < old.length - head && tail < next.length - head && old[old.length - 1 - tail].ch === next[next.length - 1 - tail]) tail++
+  const st = (old[head - 1] || old[0] || { st: {} }).st
+  const typed = next.slice(head, next.length - tail).map((ch) => ({ ch, st }))
+  return fromChars([...old.slice(0, head), ...typed, ...old.slice(old.length - tail)])
+}
+
 // offsets are counted in characters of the plain text (a newline counts as one)
 export function applyStyle(runs, a, b, patch) {
   const chars = toChars(runs)

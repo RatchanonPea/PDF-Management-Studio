@@ -636,6 +636,7 @@ html { scroll-behavior: smooth; }
 
 /* ---------- toolbar that floats over the selected text / picture ---------- */
 .textbar { position: fixed; z-index: 45; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; max-width: min(700px, calc(100vw - 16px)); padding: 6px; background: var(--paper); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 16px 34px -12px rgba(19, 28, 51, .55), 0 2px 6px rgba(19, 28, 51, .08); animation: drop-in .18s var(--ease) backwards; }
+.textbar .tb-text { flex: 1 0 100%; min-height: 40px; max-height: 120px; padding: 6px 10px; font-size: 16px; line-height: 1.4; resize: none; }
 .textbar .tb-font { width: 168px; }
 .textbar .select { min-height: 38px; padding: 4px 8px 4px 10px; }
 .textbar .select-value { font-size: 15px; }
@@ -660,7 +661,10 @@ html { scroll-behavior: smooth; }
 .fmt { flex-wrap: wrap; max-width: 100%; }
 /* one wide control must never push the whole side panel wider than its column */
 .panel, .panel-body { min-width: 0; }
-.panel-body { grid-template-columns: minmax(0, 1fr); }
+.panel-body, .panel .field, .font-select { grid-template-columns: minmax(0, 1fr); }
+.fmt { gap: 2px; }
+.fmt button { width: 34px; }
+.fmt .sep { margin: 0 2px; }
 .fmt button:has(.thin) { width: auto; padding: 0 10px; }
 @media (max-width: 900px) { .textbar { display: none; } }
 

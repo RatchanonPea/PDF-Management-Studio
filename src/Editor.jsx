@@ -3,7 +3,7 @@ import { renderToCanvas, getTextRuns, splitAtRules, textToPng, richToPng, nextId
 import { Icon } from './icons.jsx'
 import { SIGN_FONTS, FONTS, CUSTOM_FONTS, getFont, fontStack } from './fonts.js'
 import { FontSelect, TextInspector } from './TextInspector.jsx'
-import { plain, applyStyle, stylesIn } from './rich.js'
+import { plain, applyStyle, stylesIn, replaceText } from './rich.js'
 import { Select } from './Select.jsx'
 import { Tip } from './Tip.jsx'
 import { ColorField } from './ColorField.jsx'
@@ -238,6 +238,7 @@ export function Editor({ tab, onTab, onBack, onDirty, pages, sources, addFiles, 
   // the floating toolbar follows the selected text / picture on the page
   const [tbPos, setTbPos] = useState(null)
   const tbRef = useRef(null)
+  const wantFocus = useRef(false) // set when a line was just clicked: the text field in the bar takes the cursor
   useEffect(() => {
     const place = () => {
       const el = root.current?.querySelector('.stamp-layer.is-sel')
@@ -245,11 +246,37 @@ export function Editor({ tab, onTab, onBack, onDirty, pages, sources, addFiles, 
       if (!el || !cur || cur.box || root.current.offsetParent === null) { setTbPos(null); return }
       const r = el.getBoundingClientRect()
       const w = tbRef.current?.offsetWidth || 440
-      const h = tbRef.current?.offsetHeight || 54
-      let top = r.top - h - 10
-      if (top < 76) top = r.bottom + 10 // no room above: sit below it
-      const left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8))
-      setTbPos((p) => (p && p.top === top && p.left === left ? p : { top, left }))
+      const h = tbRef.current?.offsetHeight || 96
+      // the bar stays over the page area, never over the side panel
+      const panelEl = root.current.querySelector('.panel')
+      const vw = window.innerWidth > 900 && panelEl ? panelEl.getBoundingClientRect().left : window.innerWidth
+      const vh = window.innerHeight
+      const maxW = Math.min(700, vw - 16)
+      const TOP = 76 // under the site header
+      const BAND = 130 // the page toolbar (back, undo, zoom): covering it is allowed but costs a little
+      const clamp = (v, lo, hi) => Math.max(lo, Math.min(v, Math.max(lo, hi)))
+      // try above, below, right and left of the selected item, and keep the spot that covers the least other text
+      const spots = [
+        { top: r.top - h - 10, left: clamp(r.left, 8, vw - w - 8) },
+        { top: r.bottom + 10, left: clamp(r.left, 8, vw - w - 8) },
+        { top: clamp(r.top, TOP, vh - h - 8), left: r.right + 10 },
+        { top: clamp(r.top, TOP, vh - h - 8), left: r.left - w - 10 },
+      ]
+      const others = [...root.current.querySelectorAll('.run-box, .stamp-layer:not(.is-sel)')].map((n) => n.getBoundingClientRect())
+      const score = (s) => {
+        // anything that leaves the window, or the page area, is a bad spot; overlap with other text counts by area
+        const off = s.top < TOP || s.top + h > vh - 4 || s.left < 4 || s.left + w > vw - 4 ? 1e7 : 0
+        const hit = others.reduce((sum, o) => sum + Math.max(0, Math.min(s.left + w, o.right) - Math.max(s.left, o.left)) * Math.max(0, Math.min(s.top + h, o.bottom) - Math.max(s.top, o.top)), 0)
+        // covering the selected item itself is far worse than covering anything else
+        const own = Math.max(0, Math.min(s.left + w, r.right) - Math.max(s.left, r.left)) * Math.max(0, Math.min(s.top + h, r.bottom) - Math.max(s.top, r.top))
+        // text matters most, then the page toolbar
+        const band = Math.max(0, BAND - s.top) * w * 0.1
+        return off + hit * 10 + band + own * 100
+      }
+      const best = spots.reduce((a, b) => (score(b) < score(a) ? b : a))
+      const top = Math.round(clamp(best.top, TOP, vh - h - 8))
+      const left = Math.round(clamp(best.left, 8, vw - w - 8))
+      setTbPos((p) => (p && p.top === top && p.left === left && p.maxW === maxW ? p : { top, left, maxW }))
     }
     place()
     const raf = requestAnimationFrame(place) // once more after the bar itself has been measured
@@ -414,6 +441,7 @@ export function Editor({ tab, onTab, onBack, onDirty, pages, sources, addFiles, 
     const { bg, ink } = sampleColors(await loadImage(preview.url), run)
     const ptH = ptW * page.ratio
     const pad = 0.004
+    wantFocus.current = true
     // the document's fonts differ from ours, so match the height of the real letters instead of trusting the font size
     const runs = runsOfParts(run.parts, run.str)
     let size = run.size
@@ -778,9 +806,18 @@ export function Editor({ tab, onTab, onBack, onDirty, pages, sources, addFiles, 
       </aside>
 
       {tbPos && sel && (
-        <div className="textbar" ref={tbRef} style={{ top: tbPos.top, left: tbPos.left }} role="toolbar" aria-label={sel.kind === 'text' ? 'จัดรูปแบบข้อความที่เลือก' : 'ปรับรูปที่เลือก'}>
+        <div className="textbar" ref={tbRef} style={{ top: tbPos.top, left: tbPos.left, maxWidth: tbPos.maxW }} role="toolbar" aria-label={sel.kind === 'text' ? 'จัดรูปแบบข้อความที่เลือก' : 'ปรับรูปที่เลือก'}>
           {sel.kind === 'text' ? (
             <>
+              <textarea
+                className="text tb-text"
+                rows={Math.min(4, plain(sel.runs).split('\n').length)}
+                value={plain(sel.runs)}
+                spellCheck={false}
+                aria-label="ข้อความ"
+                ref={(el) => { if (el && wantFocus.current) { wantFocus.current = false; el.focus(); el.setSelectionRange(el.value.length, el.value.length) } }}
+                onChange={(e) => editItem(sel, { runs: replaceText(sel.runs, e.target.value), text: e.target.value })}
+              />
               <div className="tb-font"><Select value={sel.font} onChange={(id) => setWhole('font', id)} label="ฟอนต์" options={fontOptions} /></div>
               <div className="tb-size" role="group" aria-label="ขนาดตัวอักษร">
                 <button onClick={() => setWhole('size', Math.max(1, Math.round(sel.size) - 1))} aria-label="ลดขนาด">−</button>
