@@ -5,6 +5,19 @@ import { encryptPDF } from '@pdfsmaller/pdf-encrypt-lite'
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl
 
+// pdf.js reads text with `for await (... of readableStream)`. Safari on iPhone / iPad (and older browsers) cannot iterate a
+// ReadableStream, which showed up as "undefined is not a function (near '...e of t...')". Add the missing iterator.
+if (typeof ReadableStream !== 'undefined' && !ReadableStream.prototype[Symbol.asyncIterator]) {
+  ReadableStream.prototype[Symbol.asyncIterator] = function () {
+    const reader = this.getReader()
+    return {
+      next: () => reader.read(),
+      return: async () => { try { await reader.cancel() } catch { /* already closed */ } reader.releaseLock(); return { done: true, value: undefined } },
+      [Symbol.asyncIterator]() { return this },
+    }
+  }
+}
+
 // Older Thai fonts store raised / lowered / shifted marks as private-use codes (U+F700..). Plain fonts have no glyph for
 // them (they show as empty boxes), so they are turned back into the ordinary Thai marks.
 const THAI_PUA = {
