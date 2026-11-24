@@ -869,3 +869,10 @@ body {
 .color-rows .color-field { display: flex; min-width: 0; }
 .color-rows .color-field .hex { flex: 1; width: auto; min-width: 0; }
 @media (max-width: 420px) { .color-panel { grid-template-columns: minmax(0, 1fr); } }
+
+/* desktop: the side panel stays in view, so the download button is always visible; its content scrolls inside */
+@media (min-width: 901px) {
+  .editor > .panel { position: sticky; top: 59px; align-self: start; height: calc(100vh - 59px); max-height: calc(100dvh - 59px); overflow: hidden; }
+  .editor > .panel .panel-body { overflow-y: auto; min-height: 0; padding: 2px 4px 8px 2px; }
+  .editor > .panel .panel-foot { flex: none; }
+}
